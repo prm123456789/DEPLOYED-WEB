@@ -11,20 +11,24 @@ document.getElementById('deployForm').addEventListener('submit', (e) => {
   const statusEl = document.getElementById('status');
   statusEl.textContent = '⏳ Déploiement en cours...\n';
 
-  const evtSource = new EventSource('/api/deploy');
-  evtSource.onmessage = (event) => {
-    statusEl.textContent += `${event.data}\n`;
-    statusEl.scrollTop = statusEl.scrollHeight;
-  };
-
   fetch('/api/deploy', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(data)
-  }).then(() => {
-    evtSource.close();
+  }).then(response => {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const read = () => {
+      reader.read().then(({ done, value }) => {
+        if (done) return;
+        const text = decoder.decode(value);
+        statusEl.textContent += text;
+        statusEl.scrollTop = statusEl.scrollHeight;
+        read();
+      });
+    };
+    read();
   }).catch((err) => {
     statusEl.textContent += `❌ Erreur: ${err.message}\n`;
-    evtSource.close();
   });
 });
