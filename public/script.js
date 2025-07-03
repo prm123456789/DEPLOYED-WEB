@@ -1,4 +1,4 @@
-document.getElementById('deployForm').addEventListener('submit', async (e) => {
+document.getElementById('deployForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const form = e.target;
   const data = {
@@ -8,17 +8,23 @@ document.getElementById('deployForm').addEventListener('submit', async (e) => {
     OWNER_NUMBER: form.OWNER_NUMBER.value
   };
 
-  document.getElementById('status').textContent = '⏳ Déploiement en cours...';
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = '⏳ Déploiement en cours...\n';
 
-  try {
-    const res = await fetch('http://localhost:3001/api/deploy', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(data)
-    });
-    const result = await res.json();
-    document.getElementById('status').textContent = result.message || result.error;
-  } catch (err) {
-    document.getElementById('status').textContent = '❌ Erreur lors du déploiement';
-  }
+  const evtSource = new EventSource('/api/deploy');
+  evtSource.onmessage = (event) => {
+    statusEl.textContent += `${event.data}\n`;
+    statusEl.scrollTop = statusEl.scrollHeight;
+  };
+
+  fetch('/api/deploy', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  }).then(() => {
+    evtSource.close();
+  }).catch((err) => {
+    statusEl.textContent += `❌ Erreur: ${err.message}\n`;
+    evtSource.close();
+  });
 });
